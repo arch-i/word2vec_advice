@@ -1,5 +1,4 @@
-allAbby*pickle
-
+GoogleNews-vectors-negative300.bin.gz
 
 # Compiled source #
 ###################
@@ -44,7 +43,3 @@ Thumbs.db
 *.doc2vec
 *.pickle
 *.bin.gz
-
-*.word2vec
-
-*.word2vec
