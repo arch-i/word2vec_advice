@@ -1,4 +1,4 @@
-#!/Users/mcmenamin/.virtualenvs/py2env/bin/python
+#!/Users/mcmenamin/.virtualenvs/py3env/bin/python
 
 from lxml import html
 import requests
@@ -10,7 +10,7 @@ import pandas as pd
 import re as re
 
 from itertools import chain
-import cPickle as pickle
+import pickle
 
 from tqdm import tqdm
 
@@ -28,25 +28,29 @@ def scrape_page(extURL, baseURL='http://www.uexpress.com/'):
     for q in questions:
         qText = [i.text_content() for i in q.iterfind('p')]
         allQ += qText
+    allQ = ' '.join(allQ)
     return allQ
 
 def parseAbby(block):
-    dearBlock = [re.match('DEAR [a-zA-Z. ]+[:,\- ]+', p) is not None for p in block]
-    abbyBlock = [re.match('DEAR ABBY[:,\- ]+', p) is not None        for p in block]
-    
-    # Which paragraphs are the starts of questions, starts of answers
-    Qstart = [i for i in range(len(block)) if abbyBlock[i]]
-    Astart = [i for i in range(len(block)) if dearBlock[i] and not abbyBlock[i]]
-    
-    QA_pairs = [[]]
-    if len(Qstart)>0 and len(Astart)>0:
-        numQApairs = len(Qstart)
+    block = block.strip().split('DEAR ')
 
-        Q = [' '.join(block[i[0]:i[1]]) for i in zip(Qstart, Astart)]
-        A = [' '.join(block[i[0]:i[1]]) for i in zip(Astart, Qstart[1:]+[len(block)])]
-        QA_pairs = zip(Q, A)
+    abbyBlock = [p.startswith('ABBY:') for p in block]
+    dearReaderBlock = [p.startswith('READERS:') for p in block]
+    replyBlock = [not (p[0] or p[1]) for p in zip(abbyBlock, dearReaderBlock)]
+    
+    QA_pairs = []
+    if True in abbyBlock and True in replyBlock:
+        firstBlock = abbyBlock.index(True)
+        
+        block = block[firstBlock:]
+        abbyBlock = abbyBlock[firstBlock:]
+        dearReaderBlock = dearReaderBlock[firstBlock:]
+        replyBlock = replyBlock[firstBlock:]
+        
+        for i in range(len(block)-1):
+            if abbyBlock[i] and replyBlock[i+1]:
+                QA_pairs.append([block[i], block[i+1]])
     return QA_pairs
-
 
 
 #

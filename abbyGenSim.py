@@ -5,76 +5,8 @@ import gensim
 import logging
 
 
-###########################################
-###########################################
-##
-## Set up WordVectors
-##
-
-"""
-This section take the big google-provided word2vec vectors
-and does the following processing steps:
-
-- clean up the vocab by forcing everything to lowercase,
-  trimming out punctuation, etc. If there are multiple vectors
-  that map to the same final word (e.g., Dog and dog), those
-  vectors are averaged
-
-- save a dictionary that maps each word to a vector index
-
-- save an array of the normalized vector embeddings that can
-  be loaded as a memory map
-"""
-
 vocabFname = '/Users/mcmenamin/GitHub/word2vec_advice/wordDict.npy'
 mmapVecsFname = '/Users/mcmenamin/GitHub/word2vec_advice/wordVecs.npy'
-makeNewMMap = False
-
-transTable_goog = {ord(i): None for i in string.punctuation if i not in ['_']}
-
-
-def cleanUpGoogleword(s):
-    s = s.lower().translate(transTable_goog).strip(string.punctuation)
-    return s
-
-if makeNewMMap:
-    googleWord2Vec = '/Users/mcmenamin/GitHub/word2vec_advice/GoogleNews-vectors-negative300.bin.gz'
-    model = gensim.models.Word2Vec()
-    model = model.load_word2vec_format(googleWord2Vec, binary=True)
-
-    fullVocab = {val: key for key, val in enumerate(model.index2word)}
-    tmp = set()
-    for v in model.index2word:
-        tmp.add(cleanUpGoogleword(v))
-    lowerVocab = {val: key for key, val in enumerate(tmp)}
-    idxToVocab = {lowerVocab[s]: s for s in lowerVocab}
-
-    mergeIdx = {}
-    for s in fullVocab:
-        print(s)
-        sLow = cleanUpGoogleword(s)
-        if sLow in mergeIdx:
-            mergeIdx[sLow].append(fullVocab[s])
-        else:
-            mergeIdx[sLow] = [fullVocab[s]]
-
-    lowerVecs = np.zeros((len(idxToVocab), model.syn0norm.shape[1]))
-    for i in range(len(idxToVocab)):
-        if (i % 1000) == 0:
-            print('{}, {:.0f}%'.format(i, (100 * i) / len(idxToVocab)))
-        s = idxToVocab[i]
-        tmp = np.mean(model.syn0norm[mergeIdx[s], :], axis=0)
-        tmp /= np.sqrt(np.sum(tmp**2))
-        lowerVecs[i, :] = tmp
-
-    with open(vocabFname, 'wb') as file:
-        pickle.dump(lowerVocab, file)
-
-    np.save(mmapVecsFname, lowerVecs)
-
-    lowerVecs = None
-    model = None
-
 
 with open(vocabFname, 'rb') as file:
     vocabDict = pickle.load(file)
@@ -82,23 +14,6 @@ with open(vocabFname, 'rb') as file:
 idxToVocab = {vocabDict[i]: i for i in vocabDict}
 
 wordVecs = np.load(mmapVecsFname, mmap_mode='r')
-
-
-"""
-# Testing a couple of words to find similar concepts
-
-testList = ['wife', 'brother', 'affair', 'fiance']
-# testList = ['pizza', 'iphone', 'aaron_rodgers']
-for t in testList:
-    print('Seed: {}'.format(t))
-    seedVec = wordVecs[vocabDict[t], :].reshape(1, -1)
-    simList = wordVecs.dot(seedVec.T).ravel()
-    cutoff = np.sort(simList)[-5]
-    closeList = []
-    for i in where(simList > cutoff)[0]:
-        closeList.append(idxToVocab[i])
-    print(closeList)
-"""
 
 
 ###########################################
@@ -113,25 +28,26 @@ tokenize each Q's and A's into the multiword phrases in our google
 vocabularly. Full phrases that are also in the stopword list are dropped
 """
 
-
-class webtext(object):
-    def __init__(self, url, rawText, bNum):
-        self.validQA = False
-        self.url = url
-        self.blockNumber = bNum
-        self.rawText = rawText
-        self.Q = []
-        self.A = []
-
-    def parseQA(self, parseMethod):
-        self.Q, self.A, self.validQA = parseMethod(self.rawText)
-
-
-with open('/Users/mcmenamin/GitHub/word2vec_advice/allAbby.pickle', 'rb') as file:
-    allQs = pickle.load(file)
+df_text = pd.read_pickle('../scrape_scripts/abbyText.pickle')
 
 
 doAllTokenizing = False
+
+def tokenizeDocstr(docStr, vocab, stopWords=[]):
+    stopWords += ['_', '']
+    docStr = docStr.strip().translate(transTable).lower().split()
+    wordList = []
+    for phrLen in range(4, 0, -1):
+        for i in range(0, len(docStr) - phrLen):
+            tmpPhrase = '_'.join(docStr[i:(i + phrLen)])
+            if tmpPhrase in vocab:
+                wordList.append(tmpPhrase)
+                docStr[i:(i + phrLen)] = [''] * phrLen
+
+    wordList = [w for w in wordList if w not in stop]
+    return wordList
+
+
 if doAllTokenizing:
 
     # get stop words
@@ -141,23 +57,7 @@ if doAllTokenizing:
         if line != '':
             SW.add(line)
     stop = list(SW)
-
     transTable = {ord(i): None for i in string.punctuation}
-
-
-    def tokenizeDocstr(docStr, vocab, stopWords=[]):
-        stopWords += ['_', '']
-        docStr = docStr.strip().translate(transTable).lower().split()
-        wordList = []
-        for phrLen in range(4, 0, -1):
-            for i in range(0, len(docStr) - phrLen):
-                tmpPhrase = '_'.join(docStr[i:(i + phrLen)])
-                if tmpPhrase in vocab:
-                    wordList.append(tmpPhrase)
-                    docStr[i:(i + phrLen)] = [''] * phrLen
-
-        wordList = [w for w in wordList if w not in stop]
-        return wordList
 
     allSentences = []
     for idx, a in enumerate(allQs):
@@ -176,6 +76,11 @@ if doAllTokenizing:
 
 with open('/Users/mcmenamin/GitHub/word2vec_advice/tokenAbby.pickle', 'rb') as file:
     allSentences = pickle.load(file)
+
+
+
+
+
 
 
 ###########################################
