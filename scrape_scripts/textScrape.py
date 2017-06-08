@@ -73,4 +73,11 @@ for url in tqdm(archivedURLs):
                           'parse_text': parseAbby(raw_text)
                           }                
 df_text = pd.DataFrame.from_dict(all_text_dict, orient='index')
+
 df_text.to_pickle('abbyText.pickle')
+
+df_text.to_json('abbyText.json',
+                lines=True,
+                orient='records',
+                force_ascii=True
+)
