@@ -45,3 +45,4 @@ Thumbs.db
 *.doc2vec
 *.pickle
 *.bin.gz
+*-checkpoint.ipynb
